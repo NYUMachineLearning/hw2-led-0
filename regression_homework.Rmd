@@ -5,6 +5,7 @@ date: "Fall 2019"
 output:
   html_document:
     df_print: paged
+  pdf_document: default
 fontsize: 11pt
 ---
 
@@ -63,7 +64,6 @@ library(ggplot2)
 library(dplyr)
 library(ggfortify)
 
-
 #Mauna Loa CO2 concentrations
 data(airquality)
 ```
@@ -72,8 +72,11 @@ data(airquality)
 1. Split data into training and test set (75% in train set, 25% in test set)
 
 ```{r}
-#train_regression = 
-#test_regression = 
+n <- nrow(airquality)
+set.seed(404)
+train_index = sample(n, 0.75*n)
+train_regression = airquality[train_index, ]
+test_regression = airquality[-train_index, ]
 ```
 
 
@@ -89,23 +92,26 @@ We will predict the response of the Temperature based on Wind.
 
 This is the data we will fit a linear model to. 
 ```{r}
-# ggplot(data = train_regression) +
-#   geom_point(aes(x=Wind, y=Temp)) +
-#   theme_bw()
+ggplot(data = train_regression) +
+  geom_point(aes(x=Wind, y=Temp)) +
+  theme_bw()
 ```
 
 2. Create and fit a linear model to predict Temperature from Wind using the training set
 
 ```{r}
 #help(train)
-
-#linear_regression <- train( ~ , data= , method = "lm")
+linear_regression <- train(Temp ~ Wind, data = train_regression, method = "lm")
+linear_coefficients <- linear_regression$finalModel$coefficients
 ```
 
 
 3. Vizualize how your model performed on the train data by plotting the regression line on top of the train data points. 
 ```{r}
-
+ggplot(data = train_regression) +
+   geom_point(aes(x=Wind, y=Temp)) +
+   geom_abline(aes(intercept = linear_coefficients[1], slope = linear_coefficients[2]), col = "red") +
+   theme_bw()
 ```
 
 
@@ -119,43 +125,58 @@ This is the data we will fit a linear model to.
 4 a) See how the model performs on the test data
 ```{r}
 #help(predict)
-#linear_predict <- predict(, newdata=)
+linear_predict <- predict(linear_regression, test_regression)
 ```
 
 4 b) Look at the residuals. Are they close to zero?
 ```{r}
 #look at the median residual value. Close to zero is best
 #help(summary)
+summary(linear_regression)
 ```
 
 
 4 c) Plot predicted temperature vs observed temperature. A strong model should show a strong correlation
 ```{r}
+ggplot() + geom_point(aes(x = linear_predict, y = test_regression$Temp)) + 
+  xlab("Predicted Temperature") + ylab("Observed Temperature") + 
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  theme_bw()
 
+cor.test(linear_predict, test_regression$Temp)
 ```
 
 4 d) Visualize the predicted values in relation to the real data points. Look for homoscedasticity
 ```{r}
 # Extract coefficients from the model
+linear_regression$finalModel$coefficients
 
 # plot the regression line on the predicted values
+ggplot() + geom_point(aes(x=test_regression$Wind, y=linear_predict)) +
+  geom_abline(aes(intercept=linear_coefficients[1], slope=linear_coefficients[2]), col = 'red') + 
+  theme_bw()
 
 # plot the original test values
-
+ggplot(data = test_regression) + 
+  geom_point(aes(x=Wind, y=linear_predict)) +
+  geom_point(aes(x=Wind, y=Temp), col = "blue") +
+  geom_segment(aes(x=Wind, y=Temp, xend=Wind, yend=linear_predict), col = "black") +
+  geom_abline(aes(intercept=linear_coefficients[1], slope=linear_coefficients[2]), col = 'red') +
+  theme_bw() + xlab("Wind") + ylab("Temperature")
 ```
 
 4 e) Residuals should be normally distributed. Plot the density of the residuals
 ```{r}
-#residuals_lin <- residuals(linear_regression)
+linear_residuals <- residuals(linear_regression)
 
-#ggplot(data=residvpredict) +
-#  geom_density(aes(residual))
+ggplot() + geom_density(aes(linear_residuals, col = "red", fill = "red"), show.legend = FALSE) +
+  xlab('residuals')
 ```
 
 
 4 f) Independent variables and residuals should not be correlated
 ```{r}
-#cor.test(train_regression$Wind, resid(linear_regression))
+cor.test(train_regression$Wind, resid(linear_regression))
 ```
 
 
@@ -163,5 +184,17 @@ This is the data we will fit a linear model to.
 
 5. Create a linear model using L1 or L2 regularization to predict Temperature from Wind and Month variables. Plot your predicted values and the real Y values on the same plot. 
 
+```{r}
+lasso_regression <- train(Temp ~ Wind + Month, data = train_regression, method = "lasso")
+lasso_predict <- predict(lasso_regression, test_regression)
 
+ggplot(data = test_regression, aes(x = Wind)) + 
+  geom_point(aes(y = lasso_predict)) + 
+  geom_point(aes(y = Temp), col = 'red') + 
+  xlab("Wind") + ylab("Temperature") + theme_bw()
 
+ggplot(data = test_regression, aes(x = Month)) + 
+  geom_point(aes(y = lasso_predict)) + 
+  geom_point(aes(y = Temp), col = 'blue') + 
+  xlab("Month") + ylab("Temperature") + theme_bw()
+```
